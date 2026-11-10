@@ -1,0 +1,9 @@
+{
+  "allowed_hosts": ["www.phila.gov", "www.pa.gov"],
+  "start_urls": [
+    "https://www.phila.gov/services/",
+    "https://www.phila.gov/programs/",
+    "https://www.phila.gov/services/mental-physical-health/",
+    "https://www.pa.gov/services"
+  ]
+}

@@ -34,6 +34,10 @@ Every response identifies its catalog release in `X-Catalog-Release`; JSON data 
 
 **Read cost details together.** `free` can mean conditional eligibility or a selected component. Other tiers are `nearly_free`, `sliding_scale`, and `varies_or_unconfirmed`. Funding filters distinguish taxes, government programs with unspecified funding, utility/telecom ratepayers, insurance, charities/providers, mixed funding, and unverified funding. `price_notes`, `cost_class`, `eligibility`, `caveats`, `availability`, and review dates remain in results. Residence does not establish citizenship or eligibility. Seasonal, closed, or invitation-only pathways remain visible with their restrictions; a match does not mean currently open enrollment.
 
+## Discover new sources
+
+Run `python3 scripts/discover.py --max-pages 30` to find candidate service links and flag changes to existing government sources. Results go to a separate review report; they never automatically become published benefits. [Scraper usage, coverage and review process](discovery/README.md). A manual GitHub Actions workflow can produce downloadable reports.
+
 ## Publish a catalog update
 
 Edit `seed/catalog.sql`, preserving existing benefit IDs and citations. Never renumber or reuse an ID; public ID `ks-000001` maps permanently to benefit 1. Run:
@@ -62,7 +66,7 @@ Render free services sleep after 15 idle minutes and may take about a minute to 
 
 ## Scope and contribution
 
-No iOS app, accounts, marketplace, messaging, real-time availability feed, or automated source refresh is implemented. The future iOS sync contract is documented. Current data is preliminary and needs ongoing human verification. Before a production launch, set up monitoring and appropriate platform traffic controls, confirm key service listings with providers, and establish a correction/review cadence.
+No iOS app, accounts, marketplace, messaging, real-time availability feed, or automatic catalog publication is implemented. The future iOS sync contract is documented. Current data is preliminary and needs ongoing human verification. Before a production launch, set up monitoring and appropriate platform traffic controls, confirm key service listings with providers, and establish a correction/review cadence.
 
 Open an issue for incorrect cost, eligibility, availability, or source information, including the resource ID, public source URL, and date checked. Do not post personal medical, income, immigration, or contact information. Use a draft pull request for catalog or code changes; describe evidence and tests. Never upgrade uncertain costs or funding to confirmed free/tax-funded claims without evidence.
 
