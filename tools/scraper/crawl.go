@@ -1,4 +1,4 @@
-package discovery
+package scraper
 
 import (
 	"context"
@@ -113,41 +113,8 @@ func parsePage(body string) (string, string, []link, error) {
 
 var terms = regexp.MustCompile(`(?i)\b(free|benefits?|assistance|health|food|housing|utilities|enroll|eligibility|services|programs)\b`)
 
-func knownSources(seed string) (map[string]string, error) {
-	data, e := os.ReadFile(seed)
-	if e != nil {
-		return nil, e
-	}
-	db, e := sql.Open("sqlite", ":memory:")
-	if e != nil {
-		return nil, e
-	}
-	defer db.Close()
-	db.SetMaxOpenConns(1)
-	if _, e = db.Exec(string(data)); e != nil {
-		return nil, e
-	}
-	rows, e := db.Query("SELECT source_id,url FROM sources")
-	if e != nil {
-		return nil, e
-	}
-	defer rows.Close()
-	known := map[string]string{}
-	for rows.Next() {
-		var id, raw string
-		if e = rows.Scan(&id, &raw); e != nil {
-			return nil, e
-		}
-		if u, e := canonical(raw); e == nil {
-			known[u] = id
-		}
-	}
-	return known, rows.Err()
-}
-
-// Crawl uses trusted, repository-maintained config and seed SQL. The mutable state
-// is deliberately separate from the seed and immutable public snapshots.
-func Crawl(ctx context.Context, config Config, seed, state string, maxPages, depth int, fetcher Fetcher) (Report, error) {
+// Crawl uses trusted source URLs and config. It only writes its own baseline state.
+func Crawl(ctx context.Context, config Config, sources map[string]string, state string, maxPages, depth int, fetcher Fetcher) (Report, error) {
 	report := Report{StartedAt: time.Now().UTC().Format(time.RFC3339Nano), ReviewRequired: true, Pages: []PageResult{}, Candidates: []Candidate{}, Errors: []Failure{}}
 	if maxPages < 1 || maxPages > 500 || depth < 0 || depth > 2 {
 		return report, fmt.Errorf("max-pages must be 1–500; depth 0–2")
@@ -162,10 +129,13 @@ func Crawl(ctx context.Context, config Config, seed, state string, maxPages, dep
 	if fetcher == nil {
 		fetcher = NewHTTPFetcher(config.AllowedHosts)
 	}
-	known, e := knownSources(seed)
-	if e != nil {
-		return report, e
+	known := map[string]string{}
+	for raw, id := range sources {
+		if u, e := canonical(raw); e == nil {
+			known[u] = id
+		}
 	}
+	var e error
 	if e = os.MkdirAll(filepath.Dir(state), 0755); e != nil {
 		return report, e
 	}

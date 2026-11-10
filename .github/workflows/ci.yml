@@ -13,7 +13,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: test -z "$(gofmt -l cmd internal docs)"
+      - run: test -z "$(gofmt -l cmd internal docs core cli tools)"
+      - name: Check API dependency boundary
+        run: |
+          if go list -deps ./cmd/keystoner | grep -Eq 'keystoner/(cli|tools/scraper)|robotstxt|x/net/html'; then
+            echo 'API must not depend on the scraper or CLI'
+            exit 1
+          fi
       - run: go vet ./...
       - run: go test -race ./...
       - run: python3 -m unittest discover -s scripts -v

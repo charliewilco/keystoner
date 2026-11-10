@@ -1,4 +1,4 @@
-package discovery
+package scraper
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func TestCrawlReviewAndChanges(t *testing.T) {
 	state := filepath.Join(t.TempDir(), "state.sqlite")
 	run := func() Report {
 		t.Helper()
-		r, e := Crawl(context.Background(), config, "../../seed/catalog.sql", state, 1, 0, f)
+		r, e := Crawl(context.Background(), config, map[string]string{}, state, 1, 0, f)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -170,12 +170,28 @@ func TestBoundsAndDepth(t *testing.T) {
 	config := Config{[]string{"example.com"}, []string{"https://example.com/"}}
 	state := filepath.Join(t.TempDir(), "state.sqlite")
 	for _, depth := range []int{0, 1} {
-		r, e := Crawl(context.Background(), config, "../../seed/catalog.sql", state, 2, depth, f)
+		r, e := Crawl(context.Background(), config, map[string]string{}, state, 2, depth, f)
 		if e != nil || r.Attempted != depth+1 {
 			t.Fatal(r, e)
 		}
 	}
-	if _, e := Crawl(context.Background(), config, "../../seed/catalog.sql", state, 0, 1, f); e == nil {
+	if _, e := Crawl(context.Background(), config, map[string]string{}, state, 0, 1, f); e == nil {
 		t.Fatal("invalid bounds")
+	}
+}
+
+func TestSourceInputIsIndependentOfCatalog(t *testing.T) {
+	f := &fakeFetcher{body: `<a href="/free">Free assistance</a>`}
+	config := Config{[]string{"example.com"}, []string{"https://example.com/"}}
+	sources := map[string]string{"https://example.com/free": "source-1"}
+	r, e := Crawl(context.Background(), config, sources, filepath.Join(t.TempDir(), "state.sqlite"), 2, 1, f)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(r.Candidates) != 0 || len(r.Pages) != 2 || r.Pages[1].SourceID == nil || *r.Pages[1].SourceID != "source-1" {
+		t.Fatalf("source matching: %+v", r)
+	}
+	if len(sources) != 1 || sources["https://example.com/free"] != "source-1" {
+		t.Fatal("source input mutated")
 	}
 }

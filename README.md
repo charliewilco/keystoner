@@ -17,6 +17,10 @@ curl 'http://localhost:8080/v1/catalog/manifest'
 
 `PORT` defaults to `8080`; `CATALOG_DIR` defaults to `catalog`. The process verifies snapshot integrity, schema, metadata, size, and SHA-256 before listening. It opens SQLite read-only. Deployments do not require a writable persistent disk.
 
+## Components
+
+`core/` owns catalog access and validation. `tools/scraper/` is a reusable crawler that accepts source URLs. `cli/` handles command arguments and report files; `cmd/discover/` is its executable. The API uses the core independently. They live in one repository with [explicit dependency boundaries](docs/architecture.md#component-boundaries).
+
 ## Public API
 
 | GET endpoint | Purpose |

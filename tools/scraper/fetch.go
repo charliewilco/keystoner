@@ -1,5 +1,5 @@
-// Package discovery finds review candidates without modifying the public catalog.
-package discovery
+// Package scraper finds review candidates without modifying the public catalog.
+package scraper
 
 import (
 	"context"

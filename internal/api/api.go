@@ -16,18 +16,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charliewilco/keystoner/core"
 	"github.com/charliewilco/keystoner/docs"
-	_ "modernc.org/sqlite"
 )
 
-type Manifest struct {
-	Release       string `json:"release"`
-	SchemaVersion int    `json:"schema_version"`
-	PublishedAt   string `json:"published_at"`
-	URL           string `json:"url"`
-	ByteSize      int64  `json:"byte_size"`
-	SHA256        string `json:"sha256"`
-}
+type Manifest = core.Manifest
 type Server struct {
 	DB       *sql.DB
 	Manifest Manifest
@@ -39,51 +32,12 @@ type Server struct {
 var releaseID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$`)
 
 func Open(root string) (*Server, error) {
-	raw, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+	catalog, err := core.Open(root)
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{root: root}
-	if err = json.Unmarshal(raw, &s.Manifest); err != nil {
-		return nil, err
-	}
+	s := &Server{DB: catalog.DB, Manifest: catalog.Manifest, snapshot: catalog.Snapshot, root: root}
 	m := s.Manifest
-	if m.SchemaVersion != 1 || !releaseID.MatchString(m.Release) || m.URL != "/v1/catalog/releases/"+m.Release+"/catalog.sqlite" {
-		return nil, fmt.Errorf("unsupported or invalid manifest")
-	}
-	s.snapshot, err = filepath.Abs(filepath.Join(root, "releases", m.Release, "catalog.sqlite"))
-	if err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(s.snapshot)
-	if err != nil {
-		return nil, err
-	}
-	sum := sha256.Sum256(data)
-	if int64(len(data)) != m.ByteSize || hex.EncodeToString(sum[:]) != m.SHA256 {
-		return nil, fmt.Errorf("snapshot size/hash mismatch")
-	}
-	uri := url.URL{Scheme: "file", Path: s.snapshot, RawQuery: "mode=ro&immutable=1"}
-	s.DB, err = sql.Open("sqlite", uri.String())
-	if err != nil {
-		return nil, err
-	}
-	fail := func(e error) (*Server, error) { s.DB.Close(); return nil, e }
-	var version int
-	var integrity, release, published string
-	var schema int
-	if err = s.DB.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
-		return fail(err)
-	}
-	if err = s.DB.QueryRow("PRAGMA integrity_check").Scan(&integrity); err != nil {
-		return fail(err)
-	}
-	if err = s.DB.QueryRow("SELECT release,schema_version,published_at FROM release_metadata").Scan(&release, &schema, &published); err != nil {
-		return fail(err)
-	}
-	if version != 1 || schema != 1 || integrity != "ok" || release != m.Release || published != m.PublishedAt {
-		return fail(fmt.Errorf("invalid snapshot metadata/integrity"))
-	}
 	s.mux = http.NewServeMux()
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		s.json(w, 200, map[string]any{"status": "ok", "release": m.Release})
