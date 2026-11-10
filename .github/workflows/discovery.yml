@@ -17,9 +17,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-go@v5
         with:
-          python-version: '3.12'
+          go-version-file: go.mod
       - uses: actions/cache/restore@v4
         with:
           path: work/discovery/state.sqlite
@@ -28,7 +28,7 @@ jobs:
       - name: Discover candidates and source changes
         env:
           MAX_PAGES: ${{ inputs.max_pages }}
-        run: python3 scripts/discover.py --max-pages "$MAX_PAGES"
+        run: go run ./cmd/discover --max-pages "$MAX_PAGES"
       - uses: actions/cache/save@v4
         if: success()
         with:

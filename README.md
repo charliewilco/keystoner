@@ -6,7 +6,7 @@ Find free things that meet your needs in Philadelphia. Keystoner starts with an 
 
 ## Run
 
-Requires Go 1.25+; no database service, account, or API key.
+Requires Go 1.26+; no database service, account, or API key.
 
 ```sh
 go run ./cmd/keystoner
@@ -36,7 +36,7 @@ Every response identifies its catalog release in `X-Catalog-Release`; JSON data 
 
 ## Discover new sources
 
-Run `python3 scripts/discover.py --max-pages 30` to find candidate service links and flag changes to existing government sources. Results go to a separate review report; they never automatically become published benefits. [Scraper usage, coverage and review process](discovery/README.md). A manual GitHub Actions workflow can produce downloadable reports.
+Run `go run ./cmd/discover --max-pages 30` to find candidate service links and flag changes to existing government sources. Results go to a separate review report; they never automatically become published benefits. [Scraper usage, coverage and review process](discovery/README.md). A manual GitHub Actions workflow can produce downloadable reports.
 
 ## Publish a catalog update
 
