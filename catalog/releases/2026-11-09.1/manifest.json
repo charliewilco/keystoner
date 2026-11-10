@@ -1,0 +1,8 @@
+{
+  "release": "2026-11-09.1",
+  "schema_version": 1,
+  "published_at": "2026-11-09T22:00:00Z",
+  "url": "/v1/catalog/releases/2026-11-09.1/catalog.sqlite",
+  "byte_size": 192512,
+  "sha256": "91ec9446c8bbaa8bc008c689c9f16b47977ff39c9b318d50c99b048e18c88c0d"
+}

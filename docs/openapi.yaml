@@ -1,0 +1,191 @@
+openapi: 3.0.3
+info:
+  title: Keystoner public catalog
+  version: 1.0.0
+  description: Preliminary sourced benefit pathways, not eligibility determinations. Read price_notes, eligibility, caveats and availability together.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Readiness and catalog release
+      responses:
+        '200':
+          description: Catalog loaded and verified
+  /v1/resources:
+    get:
+      summary: Search benefit pathways
+      parameters:
+        - {name: q, in: query, schema: {type: string, maxLength: 256}, description: Case-insensitive literal substring across name/provider/benefit/category}
+        - {name: category, in: query, schema: {type: string}, description: Exact category ID}
+        - {name: geography, in: query, schema: {type: string}, description: Exact source geography label}
+        - name: cost_tier
+          in: query
+          schema: {type: string, enum: [free, nearly_free, sliding_scale, varies_or_unconfirmed]}
+        - name: funding_class
+          in: query
+          schema: {type: string, enum: [taxpayer_funded, public_program_funding_unspecified, utility_or_telecom_ratepayer, insurance, charitable_or_provider, mixed, unverified]}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+      responses:
+        '200':
+          description: Stable ID order; filters combine with AND; unmatched values return empty results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  release: {type: string}
+                  schema_version: {type: integer}
+                  total: {type: integer}
+                  limit: {type: integer}
+                  offset: {type: integer}
+                  resources:
+                    type: array
+                    items: {$ref: '#/components/schemas/Resource'}
+        '400': {$ref: '#/components/responses/BadQuery'}
+        '500': {$ref: '#/components/responses/CatalogError'}
+  /v1/resources/{id}:
+    get:
+      summary: Full pathway and structured sources
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, example: ks-000001}}
+      responses:
+        '200':
+          description: Pathway detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  release: {type: string}
+                  schema_version: {type: integer}
+                  resource:
+                    allOf:
+                      - {$ref: '#/components/schemas/Resource'}
+                      - type: object
+                        properties:
+                          sources:
+                            type: array
+                            items: {$ref: '#/components/schemas/Source'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/CatalogError'}
+  /v1/categories:
+    get:
+      summary: Category IDs and pathway counts
+      responses:
+        '200':
+          description: Alphabetical category list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  release: {type: string}
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: string}
+                        resource_count: {type: integer}
+        '500': {$ref: '#/components/responses/CatalogError'}
+  /v1/catalog/manifest:
+    get:
+      summary: Active immutable snapshot metadata
+      responses:
+        '200':
+          description: Resolve download URL against the API origin
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Manifest'}
+  /v1/catalog/releases/{release}/catalog.sqlite:
+    get:
+      summary: Download a retained immutable SQLite snapshot
+      parameters:
+        - {name: release, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Standalone read-only SQLite database; SHA-256 ETag, immutable cache
+          headers:
+            ETag: {schema: {type: string}, description: Quoted SHA-256}
+          content:
+            application/vnd.sqlite3:
+              schema: {type: string, format: binary}
+        '206': {description: Requested byte range}
+        '304': {description: Matching conditional request}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/CatalogError'}
+components:
+  responses:
+    BadQuery:
+      description: Unknown/repeated parameter, overlong value or invalid pagination
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Unknown resource or release
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    CatalogError:
+      description: Internal catalog error
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+    Manifest:
+      type: object
+      required: [release, schema_version, published_at, url, byte_size, sha256]
+      properties:
+        release: {type: string, example: 2026-11-09.1}
+        schema_version: {type: integer, enum: [1]}
+        published_at: {type: string, format: date-time}
+        url: {type: string, description: Origin-relative immutable download path}
+        byte_size: {type: integer, format: int64}
+        sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+    Source:
+      type: object
+      properties:
+        source_id: {type: string}
+        title: {type: string}
+        url: {type: string, format: uri}
+        source_type: {type: string}
+        checked_on: {type: string, format: date}
+        notes: {type: string}
+    Resource:
+      type: object
+      required: [id, benefit_id, name, cost_tier, funding_class, price_notes, eligibility, availability, checked_on]
+      properties:
+        id: {type: string, example: ks-000001}
+        benefit_id: {type: integer, description: Permanent legacy ID; never reuse}
+        name: {type: string}
+        category: {type: string}
+        provider: {type: string}
+        geography: {type: string}
+        cost_class: {type: string, description: Detailed original research classification}
+        benefit: {type: string}
+        eligibility: {type: string}
+        income_limit_percent_fpl: {type: number, nullable: true}
+        age_rule: {type: string, nullable: true}
+        insurance_rule: {type: string}
+        how_to_access: {type: string}
+        caveats: {type: string}
+        evidence_status: {type: string}
+        checked_on: {type: string, format: date}
+        priority: {type: integer, description: Legacy research order; not personalized}
+        source_urls: {type: string, description: Legacy pipe-separated URLs; use detail sources for structured citations}
+        cost_tier: {type: string, enum: [free, nearly_free, sliding_scale, varies_or_unconfirmed]}
+        price_notes: {type: string}
+        funding_class: {type: string, enum: [taxpayer_funded, public_program_funding_unspecified, utility_or_telecom_ratepayer, insurance, charitable_or_provider, mixed, unverified]}
+        funding_basis: {type: string}
+        funding_source_id: {type: string, nullable: true}
+        availability: {type: string}
+        benefit_form: {type: string}
+        income_metric: {type: string, nullable: true}
+        income_threshold: {type: string, nullable: true}
