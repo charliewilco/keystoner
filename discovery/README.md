@@ -1,6 +1,6 @@
 # Discovering new data
 
-Run with Go 1.26+; no API key or Python runtime:
+Run with Go 1.26+; no API key:
 
 ```sh
 go run ./cmd/discover --max-pages 30 --depth 1
@@ -31,6 +31,6 @@ After this workflow is merged into the default branch, open **Actions → Discov
 
 This workflow is manually triggered; no recurring schedule is enabled. It uses no secrets, commits no changes, opens no issues and does not publish a release. Network failures may leave a partial report; check its errors and remaining queue before interpreting coverage. For a durable baseline, run locally with a backed-up state file.
 
-The Go HTML parser uses its own `pages_go_v1` baseline table inside the state database. Existing Python baseline data remains untouched; the first Go run establishes fresh baselines to avoid false change reports caused by parser differences. The API and scraper are Go; the separate catalog publisher still uses Python.
+The Go HTML parser uses its own `pages_go_v1` baseline table inside the state database. Legacy parser baseline data remains untouched; the first run with this parser establishes fresh baselines to avoid false change reports caused by parser differences. The API, scraper, and separate catalog publisher all use Go.
 
 The reusable crawler lives in `tools/scraper`, separate from `cli` argument/file handling and `core` catalog access. The CLI reads catalog source IDs through the core and passes them into the scraper. Other callers can provide their own source map without importing the CLI or opening the catalog.
