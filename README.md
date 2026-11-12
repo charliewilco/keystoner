@@ -4,6 +4,22 @@ Find free things that meet your needs in Philadelphia. Keystoner starts with an 
 
 **Initial research release:** 108 benefit pathways, 117 sources, 52 categories, researched November 9, 2026. Pathways are not distinct programs or a count of benefits any person qualifies for. Sources were reviewed online; providers have not confirmed availability or individual eligibility. Some evidence comes from official search excerpts. This is an early public data/API project, not an eligibility determination service.
 
+## Project commands
+
+Run `just` to list commands. Requires [just](https://just.systems/) plus the prerequisites for the chosen task (Go 1.26+, Python 3 for publishing, Apple `container` for local containers).
+
+```sh
+just run                         # native API
+just build                       # API executable
+just build-cli                   # separate scraper CLI
+just discover --max-pages 30     # candidate review report
+just check                       # tests and static checks
+just container-up                # build and run with Apple container
+just container-stop
+```
+
+`just container-start` starts Apple's service after initial installation/kernel setup. Use `just container-run` to reuse an existing image, or `just container-logs` to inspect it. `just publish RELEASE UTC_TIMESTAMP` runs the catalog publisher explicitly. Commands run from the repository root even when invoked in a subdirectory. Set `GO` to a Go executable path when it is not on `PATH`.
+
 ## Run
 
 Requires Go 1.26+; no database service, account, or API key.
