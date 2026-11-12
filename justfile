@@ -2,6 +2,9 @@ set positional-arguments
 
 export GO := env("GO", "go")
 
+alias up := container-up
+alias stop := container-stop
+
 # List available commands.
 default:
     @just --list

@@ -14,8 +14,8 @@ just build                       # API executable
 just build-cli                   # separate scraper CLI
 just discover --max-pages 30     # candidate review report
 just check                       # tests and static checks
-just container-up                # build and run with Apple container
-just container-stop
+just up                # build and run with Apple container
+just stop
 ```
 
 `just container-start` starts Apple's service after initial installation/kernel setup. Use `just container-run` to reuse an existing image, or `just container-logs` to inspect it. `just publish RELEASE UTC_TIMESTAMP` runs the catalog publisher explicitly. Commands run from the repository root even when invoked in a subdirectory. Set `GO` to a Go executable path when it is not on `PATH`.
