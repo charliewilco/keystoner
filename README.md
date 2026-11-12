@@ -4,6 +4,22 @@ Find free things that meet your needs in Philadelphia. Keystoner starts with an 
 
 **Initial research release:** 108 benefit pathways, 117 sources, 52 categories, researched November 9, 2026. Pathways are not distinct programs or a count of benefits any person qualifies for. Sources were reviewed online; providers have not confirmed availability or individual eligibility. Some evidence comes from official search excerpts. This is an early public data/API project, not an eligibility determination service.
 
+## Project commands
+
+Run `just` to list commands. Requires [just](https://just.systems/) plus the prerequisites for the chosen task (Go 1.26+, Python 3 for publishing, Apple `container` for local containers).
+
+```sh
+just run                         # native API
+just build                       # API executable
+just build-cli                   # separate scraper CLI
+just discover --max-pages 30     # candidate review report
+just check                       # tests and static checks
+just up                # build and run with Apple container
+just stop
+```
+
+`just container-start` starts Apple's service after initial installation/kernel setup. Use `just container-run` to reuse an existing image, or `just container-logs` to inspect it. `just publish RELEASE UTC_TIMESTAMP` runs the catalog publisher explicitly. Commands run from the repository root even when invoked in a subdirectory. Set `GO` to a Go executable path when it is not on `PATH`.
+
 ## Run
 
 Requires Go 1.26+; no database service, account, or API key.
@@ -35,7 +51,7 @@ On a Mac without Rosetta, set `rosetta = false` in the `[build]` section of `~/.
 
 The build uses your local Go toolchain to cross-compile a static Linux ARM64 API executable. Apple `container build` packages it using `containers/Containerfile`. Only the executable and published catalogs enter the temporary build context. The image runs as a non-root user with a read-only filesystem and exposes port 8080 on loopback only. No Docker installation or daemon is needed; Apple's builder uses the standard container build-file syntax.
 
-Set `GO` to a Go executable path if needed, `KEYSTONER_HOST_PORT` to change the local port, or `KEYSTONER_IMAGE` / `KEYSTONER_CONTAINER` to choose image/container names. The scraper CLI remains independently runnable with Go. `stop` removes only the named Keystoner container; it leaves Apple's shared service running. Render continues to use its native Go runtime, and Linux CI verifies native builds; Apple container runtime checks require a compatible Mac.
+Set `GO` to a Go executable path if needed, `KEYSTONER_HOST_PORT` to change the local port, or `KEYSTONER_IMAGE` / `KEYSTONER_CONTAINER` to choose image/container names. The scraper CLI remains independently runnable with Go. `stop` removes only the named Keystoner container; it leaves Apple's shared service running. Fly.io receives a separately built Linux AMD64 image, and Linux CI verifies native builds; Apple container runtime checks require a compatible Mac.
 
 ## Components
 
@@ -75,20 +91,26 @@ go vet ./...
 
 Use the real publication timestamp and a new release ID. The publisher checks integrity, foreign keys, required details and sourcing, exports with `VACUUM INTO`, writes a standalone versioned snapshot and release manifest, then atomically replaces the latest manifest. It refuses to overwrite releases. Run one publisher at a time; publish through reviewed Git changes and a new deployment, not inside the running service. Retain all `catalog/releases/` directories in deployments so old download URLs keep working. The API pins the active release at startup. [Architecture and offline sync](docs/architecture.md).
 
-## Host on Render
+## Host on Fly.io
 
-The repository includes a native Go `render.yaml` for a **free preview**, with `/healthz` as the health check.
+`fly.toml` configures HTTPS, port 8080, `/healthz` checks, a shared CPU with 256 MB memory, and automatic stop/start with zero minimum running Machines. The initial region is `iad`; change it if needed. The catalog ships inside the image, so no database service or persistent volume is needed.
 
-1. Sign in to Render and connect this GitHub repository.
-2. Choose **New → Blueprint**, select `charliewilco/keystoner`, and review the `keystoner` web service. Confirm the **Free** instance plan before creating it.
-3. Apply the blueprint. Render compiles and starts the Go executable and supplies an HTTPS service URL.
-4. Open `https://YOUR-SERVICE.onrender.com/healthz`, then `/v1/catalog/manifest` and `/v1/resources`. Verify the manifest download hash before connecting clients.
+Install [flyctl](https://fly.io/docs/flyctl/install/) and sign in with `fly auth login`. Choose a globally unique app name and create it in your intended organization with `fly apps create YOUR_APP --org YOUR_ORG`. App creation/deployment is an explicit hosting step; this repository has not deployed a service.
 
-No secrets, database add-on, or persistent disk are needed. Alternatively use **New → Web Service**, Go runtime, Free instance, and `/healthz`. Set the build command to `go build -trimpath -ldflags="-s -w" -o keystoner ./cmd/keystoner` and the start command to `./keystoner`. Set `CGO_ENABLED=0` and `GOTOOLCHAIN=auto`; the Go version requirement is in `go.mod`.
+Build and publish with Apple's container tooling:
 
-For a local native build, run the same build/start commands from the repository root. Keep the `catalog/` directory alongside the executable, or set `CATALOG_DIR` to its location. Build the independent scraper CLI with `go build -o work/discover ./cmd/discover`.
+```sh
+just fly-build YOUR_APP RELEASE_TAG
+# Create a short-lived app deploy token and pass it directly to Apple's registry client:
+fly tokens create deploy --app YOUR_APP --expiry 1h | container registry login --username x --password-stdin registry.fly.io
+just fly-push YOUR_APP RELEASE_TAG
+fly config validate --config fly.toml --app YOUR_APP --strict
+just fly-deploy YOUR_APP RELEASE_TAG
+```
 
-Render free services sleep after 15 idle minutes and may take about a minute to wake. The workspace has a 750 free instance-hour monthly allowance plus bandwidth/build limits. Render advises against free production hosting. Use free hosting to evaluate this API; choose paid compute when reliable public access matters. File changes on running instances are ephemeral, which is why releases are checked into the repository and included in every deployment. See [Render free-service limits](https://render.com/docs/free) and [Go hosting guide](https://render.com/docs/deploy-go-nethttp). **The project is not deployed by this repository.**
+Use a new image tag for each release. `fly-build` cross-compiles Linux AMD64 and packages it without executing AMD64 instructions, so no Rosetta or Docker daemon is needed. Local `just up` still uses ARM64. The deploy recipe uses the image already pushed to Fly's registry, with `--ha=false` to avoid provisioning a redundant second Machine on the initial deploy. It does not create an app, database or volume. Provision public addressing if the app has none: `fly ips allocate-v6 --app YOUR_APP` and `fly ips allocate-v4 --shared --app YOUR_APP`.
+
+Verify `https://YOUR_APP.fly.dev/healthz`, `/v1/catalog/manifest` and its download checksum. Review [Fly's usage pricing](https://fly.io/docs/about/pricing/) before deploying; automatic stopping does not imply free hosting. Keep historical catalog snapshots in every image. See [Fly app configuration](https://fly.io/docs/reference/configuration/) and [prebuilt image deployment](https://fly.io/docs/blueprints/using-the-fly-docker-registry/).
 
 ## Scope and contribution
 
