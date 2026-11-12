@@ -36,14 +36,14 @@ vet:
 
 # Run Go tests with the race detector.
 test-go:
-    "$GO" test -race ./...
+    "$GO" test -race -count=1 ./...
 
-# Run the catalog publisher tests.
+# Run the Go catalog publisher tests.
 test-publisher:
-    python3 -m unittest discover -s scripts -v
+    "$GO" test -race -count=1 ./tools/publisher
 
 # Run all tests.
-test: test-go test-publisher
+test: test-go
 
 # Run tests, static checks, and shell syntax validation.
 check: test vet
@@ -51,7 +51,7 @@ check: test vet
 
 # Publish a reviewed catalog: just publish RELEASE UTC_TIMESTAMP.
 publish release published_at:
-    python3 scripts/publish.py --release "$1" --published-at "$2"
+    "$GO" run ./cmd/publish --release "$1" --published-at "$2"
 
 # Start Apple's container service (install its kernel first if needed).
 container-start:

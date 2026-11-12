@@ -20,11 +20,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
       - uses: actions/cache/restore@v4
         with:
           path: work/discovery/state.sqlite
-          key: discovery-${{ github.run_id }}
-          restore-keys: discovery-
+          key: discovery-go-v1-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: discovery-go-v1-${{ github.ref_name }}-
       - name: Discover candidates and source changes
         env:
           MAX_PAGES: ${{ inputs.max_pages }}
@@ -33,7 +35,7 @@ jobs:
         if: success()
         with:
           path: work/discovery/state.sqlite
-          key: discovery-${{ github.run_id }}
+          key: discovery-go-v1-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

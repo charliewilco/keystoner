@@ -1,28 +1,82 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
+  # Keep this name stable: main's branch protection requires the "test" check.
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
+        id: go
         with:
           go-version-file: go.mod
-      - uses: actions/setup-python@v5
+          # Separate caches let source changes refresh compiled packages without
+          # repeatedly uploading the much larger, unchanged module download cache.
+          cache: false
+      - name: Locate Go caches
+        id: cache-paths
+        run: |
+          echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+      - name: Cache Go modules
+        uses: actions/cache@v4
         with:
-          python-version: '3.12'
-      - run: test -z "$(gofmt -l cmd internal docs core cli tools)"
+          path: ${{ steps.cache-paths.outputs.modules }}
+          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: |
+            go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-
+      - name: Cache Go compilation
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-paths.outputs.build }}
+          key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}-
+            go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-
+      - name: Verify dependencies
+        run: |
+          go mod download
+          go mod verify
+      - name: Check formatting
+        run: test -z "$(gofmt -l cmd internal docs core cli tools)"
       - name: Check API dependency boundary
         run: |
-          if go list -deps ./cmd/keystoner | grep -Eq 'keystoner/(cli|tools/scraper)|robotstxt|x/net/html'; then
-            echo 'API must not depend on the scraper or CLI'
+          if go list -deps ./cmd/keystoner | grep -Eq 'keystoner/(cli|tools/scraper|tools/publisher)|robotstxt|x/net/html'; then
+            echo 'API must not depend on the scraper, publisher, or CLI'
             exit 1
           fi
       - run: go vet ./...
-      - run: go test -race ./...
-      - run: python3 -m unittest discover -s scripts -v
+      - name: Test with race detection and coverage
+        # Reuse compilation, never cached test outcomes, including seed-file tests.
+        run: go test -race -count=1 -timeout=3m -coverprofile=coverage.out ./...
+      - name: Summarize coverage
+        run: |
+          go tool cover -func=coverage.out > coverage.txt
+          cat coverage.txt
+          {
+            echo '### Go test coverage'
+            echo '```text'
+            cat coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: |
+            coverage.out
+            coverage.txt
+          retention-days: 14
       - run: sh -n scripts/container.sh
       - name: Build native executables
         env:
@@ -30,4 +84,5 @@ jobs:
         run: |
           go build -trimpath -ldflags="-s -w" -o keystoner ./cmd/keystoner
           go build -trimpath -ldflags="-s -w" -o work/discover ./cmd/discover
+          go build -trimpath -ldflags="-s -w" -o work/publish ./cmd/publish
           GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o work/keystoner-linux-arm64 ./cmd/keystoner

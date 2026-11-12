@@ -146,7 +146,7 @@ func Crawl(ctx context.Context, config Config, sources map[string]string, state 
 	defer db.Close()
 	db.SetMaxOpenConns(1)
 	// Parser changes can change normalized text; use a new baseline namespace
-	// instead of reporting old Python hashes as real content changes.
+	// instead of reporting legacy parser hashes as real content changes.
 	if _, e = db.Exec("CREATE TABLE IF NOT EXISTS pages_go_v1(url TEXT PRIMARY KEY,sha256 TEXT NOT NULL,checked_at TEXT NOT NULL)"); e != nil {
 		return report, e
 	}

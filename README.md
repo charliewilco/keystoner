@@ -6,7 +6,7 @@ Find free things that meet your needs in Philadelphia. Keystoner starts with an 
 
 ## Project commands
 
-Run `just` to list commands. Requires [just](https://just.systems/) plus the prerequisites for the chosen task (Go 1.26+, Python 3 for publishing, Apple `container` for local containers).
+Run `just` to list commands. Requires [just](https://just.systems/) plus the prerequisites for the chosen task (Go 1.26+, Apple `container` for local containers).
 
 ```sh
 just run                         # native API
@@ -19,6 +19,21 @@ just stop
 ```
 
 `just container-start` starts Apple's service after initial installation/kernel setup. Use `just container-run` to reuse an existing image, or `just container-logs` to inspect it. `just publish RELEASE UTC_TIMESTAMP` runs the catalog publisher explicitly. Commands run from the repository root even when invoked in a subdirectory. Set `GO` to a Go executable path when it is not on `PATH`.
+
+## Tests and CI
+
+`just check` runs all Go tests with race detection, `go vet`, and shell syntax checks. Tests use temporary SQLite catalogs and fake HTTP transports; they require no external service. The checked-in catalog and seed also have integration checks.
+
+The tests cover manifest integrity and read-only access, exact search/filter/pagination results, citations, conditional and range downloads, robots/redirect restrictions, decoding limits, crawl deduplication and change detection, CLI failures, and publication rollback and reproducibility. Publisher tests verify that invalid releases cannot replace the active manifest or overwrite historical snapshots.
+
+GitHub Actions runs the required `test` check on every pull request and push to `main`, with race detection, fresh test execution (`-count=1`), coverage artifacts, formatting, dependency verification, and static native/cross builds. Superseded runs are cancelled. Downloaded modules are cached by OS, architecture, Go version, and module lockfiles; compiled packages use a separate per-commit cache with compatible fallback keys. Go determines which restored packages need rebuilding. Test outcomes and generated catalogs are never used to skip checks. The discovery workflow keeps its crawl baseline in a separate, versioned, branch-specific cache; cache eviction can still reset that optional baseline.
+
+Inspect coverage locally with:
+
+```sh
+go test -race -count=1 -coverprofile=work/coverage.out ./...
+go tool cover -html=work/coverage.out
+```
 
 ## Run
 
@@ -55,7 +70,7 @@ Set `GO` to a Go executable path if needed, `KEYSTONER_HOST_PORT` to change the 
 
 ## Components
 
-`core/` owns catalog access and validation. `tools/scraper/` is a reusable crawler that accepts source URLs. `cli/` handles command arguments and report files; `cmd/discover/` is its executable. The API uses the core independently. They live in one repository with [explicit dependency boundaries](docs/architecture.md#component-boundaries).
+`core/` owns catalog access and validation. `tools/scraper/` is a reusable crawler that accepts source URLs. `tools/publisher/` validates and publishes immutable releases. `cli/` handles command arguments and output; `cmd/discover/` and `cmd/publish/` are its executables. The API uses the core independently. They live in one repository with [explicit dependency boundaries](docs/architecture.md#component-boundaries).
 
 ## Public API
 
@@ -83,13 +98,12 @@ Run `go run ./cmd/discover --max-pages 30` to find candidate service links and f
 Edit `seed/catalog.sql`, preserving existing benefit IDs and citations. Never renumber or reuse an ID; public ID `ks-000001` maps permanently to benefit 1. Run:
 
 ```sh
-python3 scripts/publish.py --release 2026-11-10.1 --published-at 2026-11-10T15:00:00Z
-python3 -m unittest discover -s scripts -v
-go test -race ./...
+go run ./cmd/publish --release 2026-11-10.1 --published-at 2026-11-10T15:00:00Z
+go test -race -count=1 ./...
 go vet ./...
 ```
 
-Use the real publication timestamp and a new release ID. The publisher checks integrity, foreign keys, required details and sourcing, exports with `VACUUM INTO`, writes a standalone versioned snapshot and release manifest, then atomically replaces the latest manifest. It refuses to overwrite releases. Run one publisher at a time; publish through reviewed Git changes and a new deployment, not inside the running service. Retain all `catalog/releases/` directories in deployments so old download URLs keep working. The API pins the active release at startup. [Architecture and offline sync](docs/architecture.md).
+Use the real publication timestamp and a new release ID. The Go publisher requires an RFC3339 UTC publication timestamp and checks integrity, foreign keys, required details, sourcing, and resource-view queries. It exports with `VACUUM INTO`, writes a standalone versioned snapshot and release manifest, then atomically replaces the latest manifest. It refuses to overwrite releases. Run one publisher at a time; publish through reviewed Git changes and a new deployment, not inside the running service. Retain all `catalog/releases/` directories in deployments so old download URLs keep working. The API pins the active release at startup. [Architecture and offline sync](docs/architecture.md).
 
 ## Host on Fly.io
 

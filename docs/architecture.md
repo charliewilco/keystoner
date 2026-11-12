@@ -26,11 +26,12 @@ One repository and Go module contain independent packages; separate repositories
 | --- | --- | --- |
 | `core` | Open and verify immutable catalogs; read source IDs/URLs from trusted seed SQL | SQLite and standard library |
 | `tools/scraper` | Fetch pages, parse links, track crawl baselines, return review reports | HTTP/HTML/robots libraries and its own SQLite state |
-| `cli` | Parse arguments, load config/sources, invoke the scraper, write reports | Core and scraper |
+| `tools/publisher` | Validate trusted seed SQL, stage immutable releases, replace the active manifest | Core and SQLite |
+| `cli` | Parse arguments, invoke discovery or publishing, write output | Core, scraper, and publisher |
 | `internal/api` | HTTP routes, query parameters, JSON responses and downloads | Core and API docs |
-| `cmd/discover` | Process entry point and cancellation signals | CLI |
+| `cmd/discover`, `cmd/publish` | Process entry points and cancellation signals | CLI |
 | `cmd/keystoner` | API process entry point and server lifecycle | API |
 
-The scraper accepts a source URL-to-ID map: it does not load seed SQL or open public catalogs. It can run from another program without command-line parsing. The CLI joins catalog sources to scraping and owns report files; it accepts a context and output writers and never exits the process. The core imports neither the scraper nor CLI. The API binary likewise imports neither, and its native build compiles only its server dependency graph. They share a module lockfile, not runtime coupling. The Python catalog publisher remains a separate release-preparation utility.
+The scraper accepts a source URL-to-ID map: it does not load seed SQL or open public catalogs. It can run from another program without command-line parsing. The CLI joins catalog sources to scraping and owns report files; it accepts a context and output writers and never exits the process. The core imports neither the scraper nor CLI. The API binary likewise imports neither, and its native build compiles only its server dependency graph. They share a module lockfile, not runtime coupling. The Go catalog publisher (`tools/publisher`, invoked by `cmd/publish`) remains a separate release-preparation utility and is excluded from the API dependency graph.
 
 Local macOS packaging uses Apple `container` and `containers/Containerfile`. A temporary context contains only the statically compiled Linux ARM64 API and immutable catalogs. The image has no shell or scraper and runs non-root with a read-only filesystem. Fly.io deployment uses a separate Linux AMD64 build of the same API and catalog, pushed with Apple container to Fly’s registry. Local containers remain ARM64.
