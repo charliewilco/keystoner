@@ -75,3 +75,15 @@ container-logs:
 # Stop and remove the API container.
 container-stop:
     ./scripts/container.sh stop
+
+# Build a Linux AMD64 image for Fly using Apple's container builder.
+fly-build app tag:
+    KEYSTONER_ARCH=amd64 KEYSTONER_IMAGE="registry.fly.io/$1:$2" ./scripts/container.sh build
+
+# Push the prepared image using Apple's registry client (login required).
+fly-push app tag:
+    container image push "registry.fly.io/$1:$2"
+
+# Deploy the already-pushed image to an existing Fly app.
+fly-deploy app tag:
+    fly deploy --config fly.toml --app "$1" --image "registry.fly.io/$1:$2" --ha=false
