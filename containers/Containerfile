@@ -1,0 +1,9 @@
+# Built with Apple's `container build` from a staged API-only context.
+FROM scratch
+WORKDIR /app
+COPY keystoner /app/keystoner
+COPY catalog /app/catalog
+USER 65532:65532
+ENV PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/app/keystoner"]

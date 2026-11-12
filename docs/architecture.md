@@ -17,3 +17,20 @@ The publisher imports SQL into a fresh private database, validates it, and uses 
 7. Show data review dates and uncertainty offline. Network failures must preserve the old usable catalog. Full snapshots are the initial protocol: there is no incremental or account sync.
 
 Schema changes require a new schema_version, documented migration/read compatibility, and a compatible app release. Keep release/content IDs distinct from schema versions. The server startup verification prevents manifest/database mismatch. HTTP responses use short cache lifetimes; immutable snapshots use one-year caching and a hash ETag. Deployment is a process restart with a new pinned catalog, not an in-process manifest switch.
+
+## Component boundaries
+
+One repository and Go module contain independent packages; separate repositories or releases are not required to reuse them.
+
+| Component | Responsibility | Depends on |
+| --- | --- | --- |
+| `core` | Open and verify immutable catalogs; read source IDs/URLs from trusted seed SQL | SQLite and standard library |
+| `tools/scraper` | Fetch pages, parse links, track crawl baselines, return review reports | HTTP/HTML/robots libraries and its own SQLite state |
+| `cli` | Parse arguments, load config/sources, invoke the scraper, write reports | Core and scraper |
+| `internal/api` | HTTP routes, query parameters, JSON responses and downloads | Core and API docs |
+| `cmd/discover` | Process entry point and cancellation signals | CLI |
+| `cmd/keystoner` | API process entry point and server lifecycle | API |
+
+The scraper accepts a source URL-to-ID map: it does not load seed SQL or open public catalogs. It can run from another program without command-line parsing. The CLI joins catalog sources to scraping and owns report files; it accepts a context and output writers and never exits the process. The core imports neither the scraper nor CLI. The API binary likewise imports neither, and its native build compiles only its server dependency graph. They share a module lockfile, not runtime coupling. The Python catalog publisher remains a separate release-preparation utility.
+
+Local macOS packaging uses Apple `container` and `containers/Containerfile`. A temporary context contains only the statically compiled Linux ARM64 API and immutable catalogs. The image has no shell or scraper and runs non-root with a read-only filesystem. Native Render deployment remains independent of this macOS development tool.

@@ -1,0 +1,42 @@
+name: Discover catalog sources
+on:
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: Maximum pages to attempt (1–500)
+        default: '30'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: catalog-discovery
+  cancel-in-progress: false
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/cache/restore@v4
+        with:
+          path: work/discovery/state.sqlite
+          key: discovery-${{ github.run_id }}
+          restore-keys: discovery-
+      - name: Discover candidates and source changes
+        env:
+          MAX_PAGES: ${{ inputs.max_pages }}
+        run: go run ./cmd/discover --max-pages "$MAX_PAGES"
+      - uses: actions/cache/save@v4
+        if: success()
+        with:
+          path: work/discovery/state.sqlite
+          key: discovery-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-review
+          path: work/discovery/report.json
+          retention-days: 30
