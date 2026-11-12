@@ -57,16 +57,18 @@ Use the real publication timestamp and a new release ID. The publisher checks in
 
 ## Host on Render
 
-The repository includes a Dockerfile and `render.yaml` for a **free preview**, with `/healthz` as the health check.
+The repository includes a native Go `render.yaml` for a **free preview**, with `/healthz` as the health check.
 
 1. Sign in to Render and connect this GitHub repository.
 2. Choose **New → Blueprint**, select `charliewilco/keystoner`, and review the `keystoner` web service. Confirm the **Free** instance plan before creating it.
-3. Apply the blueprint. Render builds the Docker image and supplies an HTTPS service URL.
+3. Apply the blueprint. Render compiles and starts the Go executable and supplies an HTTPS service URL.
 4. Open `https://YOUR-SERVICE.onrender.com/healthz`, then `/v1/catalog/manifest` and `/v1/resources`. Verify the manifest download hash before connecting clients.
 
-No secrets, database add-on, or persistent disk are needed. Alternatively use **New → Web Service**, Docker runtime, Free instance, and `/healthz`. Local container: `docker build -t keystoner .` then `docker run --rm -p 8080:8080 --read-only keystoner`.
+No secrets, database add-on, or persistent disk are needed. Alternatively use **New → Web Service**, Go runtime, Free instance, and `/healthz`. Set the build command to `go build -trimpath -ldflags="-s -w" -o keystoner ./cmd/keystoner` and the start command to `./keystoner`. Set `CGO_ENABLED=0` and `GOTOOLCHAIN=auto`; the Go version requirement is in `go.mod`.
 
-Render free services sleep after 15 idle minutes and may take about a minute to wake. The workspace has a 750 free instance-hour monthly allowance plus bandwidth/build limits. Render advises against free production hosting. Use free hosting to evaluate this API; choose paid compute when reliable public access matters. File changes on running instances are ephemeral, which is why releases are bundled into the image. See [Render free-service limits](https://render.com/docs/free) and [Go hosting guide](https://render.com/docs/deploy-go-nethttp). **The project is not deployed by this repository.**
+For a local native build, run the same build/start commands from the repository root. Keep the `catalog/` directory alongside the executable, or set `CATALOG_DIR` to its location. Build the independent scraper CLI with `go build -o work/discover ./cmd/discover`.
+
+Render free services sleep after 15 idle minutes and may take about a minute to wake. The workspace has a 750 free instance-hour monthly allowance plus bandwidth/build limits. Render advises against free production hosting. Use free hosting to evaluate this API; choose paid compute when reliable public access matters. File changes on running instances are ephemeral, which is why releases are checked into the repository and included in every deployment. See [Render free-service limits](https://render.com/docs/free) and [Go hosting guide](https://render.com/docs/deploy-go-nethttp). **The project is not deployed by this repository.**
 
 ## Scope and contribution
 

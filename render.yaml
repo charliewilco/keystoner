@@ -1,9 +1,15 @@
 services:
   - type: web
     name: keystoner
-    runtime: docker
+    runtime: go
+    buildCommand: go build -trimpath -ldflags="-s -w" -o keystoner ./cmd/keystoner
+    startCommand: ./keystoner
     plan: free
     healthCheckPath: /healthz
     envVars:
+      - key: CGO_ENABLED
+        value: "0"
+      - key: GOTOOLCHAIN
+        value: auto
       - key: PORT
         value: 8080
