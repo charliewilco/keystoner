@@ -17,6 +17,26 @@ curl 'http://localhost:8080/v1/catalog/manifest'
 
 `PORT` defaults to `8080`; `CATALOG_DIR` defaults to `catalog`. The process verifies snapshot integrity, schema, metadata, size, and SHA-256 before listening. It opens SQLite read-only. Deployments do not require a writable persistent disk.
 
+## Run with Apple container on macOS
+
+Install [Apple's container tool](https://github.com/apple/container) on an Apple silicon Mac running macOS 26 or later, then:
+
+```sh
+container system kernel set --recommended
+container system start
+./scripts/container.sh build
+./scripts/container.sh run
+curl http://127.0.0.1:8080/healthz
+./scripts/container.sh logs
+./scripts/container.sh stop
+```
+
+On a Mac without Rosetta, set `rosetta = false` in the `[build]` section of `~/.config/container/config.toml` before starting the service. Preserve any existing configuration. If the service is already running, restart it after the change. This project builds ARM64 images and does not need x86 translation. See [Apple's configuration reference](https://github.com/apple/container/blob/1.7.1/docs/container-system-config.md).
+
+The build uses your local Go toolchain to cross-compile a static Linux ARM64 API executable. Apple `container build` packages it using `containers/Containerfile`. Only the executable and published catalogs enter the temporary build context. The image runs as a non-root user with a read-only filesystem and exposes port 8080 on loopback only. No Docker installation or daemon is needed; Apple's builder uses the standard container build-file syntax.
+
+Set `GO` to a Go executable path if needed, `KEYSTONER_HOST_PORT` to change the local port, or `KEYSTONER_IMAGE` / `KEYSTONER_CONTAINER` to choose image/container names. The scraper CLI remains independently runnable with Go. `stop` removes only the named Keystoner container; it leaves Apple's shared service running. Render continues to use its native Go runtime, and Linux CI verifies native builds; Apple container runtime checks require a compatible Mac.
+
 ## Components
 
 `core/` owns catalog access and validation. `tools/scraper/` is a reusable crawler that accepts source URLs. `cli/` handles command arguments and report files; `cmd/discover/` is its executable. The API uses the core independently. They live in one repository with [explicit dependency boundaries](docs/architecture.md#component-boundaries).

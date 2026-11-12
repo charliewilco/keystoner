@@ -32,3 +32,5 @@ One repository and Go module contain independent packages; separate repositories
 | `cmd/keystoner` | API process entry point and server lifecycle | API |
 
 The scraper accepts a source URL-to-ID map: it does not load seed SQL or open public catalogs. It can run from another program without command-line parsing. The CLI joins catalog sources to scraping and owns report files; it accepts a context and output writers and never exits the process. The core imports neither the scraper nor CLI. The API binary likewise imports neither, and its native build compiles only its server dependency graph. They share a module lockfile, not runtime coupling. The Python catalog publisher remains a separate release-preparation utility.
+
+Local macOS packaging uses Apple `container` and `containers/Containerfile`. A temporary context contains only the statically compiled Linux ARM64 API and immutable catalogs. The image has no shell or scraper and runs non-root with a read-only filesystem. Native Render deployment remains independent of this macOS development tool.

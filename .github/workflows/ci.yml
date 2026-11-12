@@ -23,9 +23,11 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: python3 -m unittest discover -s scripts -v
+      - run: sh -n scripts/container.sh
       - name: Build native executables
         env:
           CGO_ENABLED: '0'
         run: |
           go build -trimpath -ldflags="-s -w" -o keystoner ./cmd/keystoner
           go build -trimpath -ldflags="-s -w" -o work/discover ./cmd/discover
+          GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o work/keystoner-linux-arm64 ./cmd/keystoner
